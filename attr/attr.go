@@ -21,7 +21,7 @@ const (
 var gNodes []node
 
 func init() {
-	gNodes = initCreateWrite(true)
+	gNodes = initWrite()
 }
 
 // Add increments value for 'attr' by 'delta'
@@ -42,28 +42,16 @@ func Set(attr, value uint64) {
 	}
 }
 
-func initCreateWrite(write bool) []node {
+func initWrite() []node {
 	// prepare
-	openFlags := os.O_RDONLY
-	mmapProts := syscall.PROT_READ
-	if write {
+	const (
 		openFlags = os.O_RDWR
-		mmapProts |= syscall.PROT_WRITE
-	}
+		mmapProts = syscall.PROT_READ | syscall.PROT_WRITE
+	)
 	// open file
 	file, err := os.OpenFile(filePath, openFlags, 0)
 	if err != nil {
-		// create file
-		file, err = os.Create(filePath)
-		if err != nil {
-			panic(fmt.Sprintf("cannot create file '%v' for package 'attr': %v", filePath, err))
-		}
-		// init file
-		err = file.Truncate(maxLen * int64(unsafe.Sizeof(node{})))
-		if err != nil {
-			file.Close()
-			panic(fmt.Sprintf("cannot initialize file '%v' for package 'attr': %v", filePath, err))
-		}
+		panic(fmt.Sprintf("cannot find file '%v' for package 'attr': %v", filePath, err))
 	}
 	// get file size
 	ls, err := file.Stat()
