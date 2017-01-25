@@ -1,16 +1,18 @@
 package common
 
 import (
-	"fmt"
 	"os"
 	"syscall"
 	"unsafe"
 )
 
-func AttachShm(create bool) Mem {
+const (
+	filePath = "/tmp/attr.data"
+	maxLen   = int64(10 << 10)
+)
+
+func AttachShm(create bool) (mem Mem, err error) {
 	const (
-		filePath  = "/tmp/attr.data"
-		maxLen    = int64(10 << 10)
 		openFlags = os.O_RDWR
 		mmapProts = syscall.PROT_READ | syscall.PROT_WRITE
 	)
@@ -18,28 +20,28 @@ func AttachShm(create bool) Mem {
 	file, err := os.OpenFile(filePath, openFlags, 0)
 	if err != nil {
 		if !create {
-			panic(fmt.Sprintf("open file '%v' failed, maybe create it first: %v", filePath, err))
+			return
 		}
 		// create file
 		file, err = os.Create(filePath)
 		if err != nil {
-			panic(fmt.Sprintf("cannot create file '%v': %v", filePath, err))
+			return
 		}
+		defer file.Close()
 		// init file
 		err = file.Truncate(maxLen * int64(unsafe.Sizeof(Node{})))
 		if err != nil {
-			file.Close()
-			panic(fmt.Sprintf("cannot initialize file '%v': %v", filePath, err))
+			return
 		}
+	} else {
+		defer file.Close()
 	}
-	// get file size
+	// calc node count
 	ls, err := file.Stat()
 	if err != nil {
-		file.Close()
-		panic(fmt.Sprintf("cannot lstat file '%v': %v", filePath, err))
+		return
 	}
 	size := ls.Size()
-	// calc node count
 	len := size / int64(unsafe.Sizeof(Node{}))
 	if len > maxLen {
 		len = maxLen
@@ -47,7 +49,7 @@ func AttachShm(create bool) Mem {
 	// memory map
 	ptr, err := syscall.Mmap(int(file.Fd()), 0, int(size), mmapProts, syscall.MAP_SHARED)
 	if err != nil {
-		panic(fmt.Sprintf("cannot mmap file '%v'(size=%v): %v", filePath, size, err))
+		return
 	}
-	return (*[maxLen]Node)(unsafe.Pointer(&ptr[0]))[:len]
+	return (*[maxLen]Node)(unsafe.Pointer(&ptr[0]))[:len], nil
 }
