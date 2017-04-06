@@ -3,12 +3,12 @@ package attr
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/daidodo/testa/assert"
 )
 
-func getValue(attr uint64) uint64 {
-	if n := findNode(attr); n != nil {
-		return n.value
+func getValue(attr uint32) uint64 {
+	if n := ns.FindNode(attr); n != nil {
+		return n.Value
 	}
 	return 0
 }
@@ -35,6 +35,6 @@ func TestSet(t *testing.T) {
 	const attr = 23456
 	for i := 0; i < 10; i++ {
 		Set(attr, uint64(i))
-		assert.Equal(t, uint64(i), getValue(attr))
+		assert.EqualValue(t, i, getValue(attr))
 	}
 }
