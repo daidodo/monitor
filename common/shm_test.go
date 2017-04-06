@@ -1,17 +1,16 @@
 package common
 
 import (
-	"fmt"
 	"os"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/daidodo/testa/assert"
 )
 
-func TestAttachShm(t *testing.T) {
+func TestAttach(t *testing.T) {
 	cases := []struct {
 		create bool
-		mem    Mem
+		mem    Nodes
 		memEq  bool
 		err    error
 		errEq  bool
@@ -22,14 +21,11 @@ func TestAttachShm(t *testing.T) {
 	}
 	// setup
 	if e := os.Remove(filePath); e != nil {
-		if _, ok := e.(*os.PathError); !ok {
-
-			assert.FailNow(t, fmt.Sprintf("cannot remove '%v': %v(%T)", filePath, e, e))
-		}
+		assert.EqualType(t, e, (*os.PathError)(nil), "cannot remove '%v': %v(%T)", filePath, e, e)
 	}
 	// test
 	for _, c := range cases {
-		m, e := AttachShm(c.create)
+		m, e := Attach(c.create)
 		if c.memEq {
 			assert.Equal(t, c.mem, m)
 		} else {

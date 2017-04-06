@@ -2,6 +2,7 @@ package common
 
 import (
 	"os"
+	"sync/atomic"
 	"syscall"
 	"unsafe"
 )
@@ -11,7 +12,31 @@ const (
 	maxLen   = int64(10 << 10)
 )
 
-func AttachShm(create bool) (mem Mem, err error) {
+type Node struct {
+	Attr  uint32
+	pad   uint32
+	Value uint64
+}
+
+type Nodes []Node
+
+func (m Nodes) FindNode(attr uint32) *Node {
+	if attr > 0 {
+		for i := 0; i < len(m); i++ {
+			n := &m[i]
+			if n.Attr == 0 {
+				if atomic.CompareAndSwapUint32(&n.Attr, 0, attr) {
+					return n
+				}
+			} else if attr == n.Attr {
+				return n
+			}
+		}
+	}
+	return nil
+}
+
+func Attach(create bool) (mem Nodes, err error) {
 	const (
 		openFlags = os.O_RDWR
 		mmapProts = syscall.PROT_READ | syscall.PROT_WRITE
