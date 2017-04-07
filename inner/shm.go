@@ -18,6 +18,12 @@ type Node struct {
 	Value uint64
 }
 
+func (n *Node) Reset() {
+	n.Attr = 0
+	n.pad = 0
+	n.Value = 0
+}
+
 type Nodes []Node
 
 func (m Nodes) FindNode(attr uint32) *Node {
