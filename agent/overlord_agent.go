@@ -29,7 +29,7 @@ func main() {
 	// loop
 	log.Println("program started")
 	for {
-		time.Sleep(2 * time.Second)
+		time.Sleep(60 * time.Second)
 		report := &Report{}
 		for _, n := range ns {
 			if n.Attr == 0 {
