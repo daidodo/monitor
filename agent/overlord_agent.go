@@ -26,17 +26,52 @@ func main() {
 	if err != nil {
 		log.Fatalf("Cannot init network: %v\n", err)
 	}
+	log.Printf("local=(%v, %v), remote=(%v, %v)", conn.LocalAddr().Network(), conn.LocalAddr().String(), conn.RemoteAddr().Network(), conn.RemoteAddr().String())
 	// loop
 	log.Println("program started")
 	for {
-		time.Sleep(60 * time.Second)
-		report := &Report{}
+		time.Sleep(6 * time.Second)
+		report := &inner.AgentReport{}
+		// interfaces & ips
+		if ifs, err := net.Interfaces(); err == nil {
+			for _, i := range ifs {
+				if i.Flags&net.FlagUp == 0 || i.Flags&net.FlagLoopback != 0 {
+					continue
+				}
+				var ip net.IP
+				as, err := i.Addrs()
+				if err != nil {
+					log.Printf("Cannot get addrs for interface %v: %v", i.Name, err)
+					continue
+				}
+				for _, a := range as {
+					ipn, ok := a.(*net.IPNet)
+					if !ok {
+						continue
+					}
+					if ip4 := ipn.IP.To4(); ip4 != nil {
+						ip = ip4
+						break
+					} else if ip == nil {
+						ip = ipn.IP
+					}
+				}
+				if ip == nil {
+					continue
+				}
+				a := &inner.AgentReport_Addr{Mac: i.HardwareAddr, Ip: ip}
+				report.Addrs = append(report.Addrs, a)
+			}
+		} else {
+			log.Printf("Cannot get interfaces: %v", err)
+		}
+		// attrs
 		for _, n := range ns {
 			if n.Attr == 0 {
 				break
 			}
-			a := Report_Node{Attr: proto.Uint32(n.Attr), Value: proto.Uint64(n.Value)}
-			report.Attrs = append(report.Attrs, &a)
+			a := &inner.AgentReport_Node{Attr: proto.Uint32(n.Attr), Value: proto.Uint64(n.Value)}
+			report.Attrs = append(report.Attrs, a)
 		}
 		msg, err := proto.Marshal(report)
 		if err != nil {
@@ -44,7 +79,7 @@ func main() {
 			continue
 		}
 		if len(msg) < 1 {
-			log.Printf("msg has 0 length for report=%v\n", report)
+			log.Printf("msg has 0 size for report=%v\n", report)
 			continue
 		}
 		n, err := conn.Write(msg)
@@ -56,7 +91,9 @@ func main() {
 			log.Printf("%v bytes were sent for msg (size=%v)\n", n, len(msg))
 			continue
 		}
-		//log.Printf("msg (size=%v) were sent to %v", len(msg), conn.RemoteAddr())
+		// debug
+		log.Printf("msg (size=%v) were sent to %v, report=%v", len(msg), conn.RemoteAddr(), report)
+
 	}
 	// exit
 	log.Fatalln("program exit!")

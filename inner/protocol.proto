@@ -1,0 +1,14 @@
+package inner;
+
+message AgentReport {
+    message Addr {
+        optional bytes mac = 1;
+        optional bytes ip = 2;
+    }
+    message Node {
+        optional uint32 attr = 1;
+        optional uint64 value = 2;
+    }
+    repeated Addr addrs = 1;
+    repeated Node attrs = 2;
+}

@@ -1,9 +1,0 @@
-package main;
-
-message Report {
-    message Node {
-        optional uint32 attr = 1;
-        optional uint64 value = 2;
-    }
-    repeated Node attrs = 1;
-}
