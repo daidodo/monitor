@@ -26,11 +26,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Cannot init network: %v\n", err)
 	}
-	log.Printf("local=(%v, %v), remote=(%v, %v)", conn.LocalAddr().Network(), conn.LocalAddr().String(), conn.RemoteAddr().Network(), conn.RemoteAddr().String())
+	defer conn.Close()
 	// loop
 	log.Println("program started")
 	for {
-		time.Sleep(6 * time.Second)
+		time.Sleep(60 * time.Second)
 		report := &inner.AgentReport{}
 		// interfaces & ips
 		if ifs, err := net.Interfaces(); err == nil {
@@ -70,6 +70,7 @@ func main() {
 			if n.Attr == 0 {
 				break
 			}
+			// atomic operation
 			a := &inner.AgentReport_Node{Attr: proto.Uint32(n.Attr), Value: proto.Uint64(n.Value)}
 			report.Attrs = append(report.Attrs, a)
 		}
@@ -93,7 +94,6 @@ func main() {
 		}
 		// debug
 		log.Printf("msg (size=%v) were sent to %v, report=%v", len(msg), conn.RemoteAddr(), report)
-
 	}
 	// exit
 	log.Fatalln("program exit!")
