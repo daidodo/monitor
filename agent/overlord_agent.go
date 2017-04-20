@@ -38,28 +38,28 @@ func main() {
 				if i.Flags&net.FlagUp == 0 || i.Flags&net.FlagLoopback != 0 {
 					continue
 				}
-				var ip net.IP
 				as, err := i.Addrs()
 				if err != nil {
 					log.Printf("Cannot get addrs for interface %v: %v", i.Name, err)
 					continue
 				}
+				var ips []string
 				for _, a := range as {
 					ipn, ok := a.(*net.IPNet)
 					if !ok {
 						continue
 					}
-					if ip4 := ipn.IP.To4(); ip4 != nil {
+					ip := ipn.IP
+					if ip4 := ip.To4(); ip4 != nil {
 						ip = ip4
-						break
-					} else if ip == nil {
-						ip = ipn.IP
 					}
+					ips = append(ips, ip.String())
 				}
-				if ip == nil {
+				if len(ips) == 0 {
 					continue
 				}
-				a := &inner.AgentReport_Addr{Mac: i.HardwareAddr, Ip: ip}
+				mac := i.HardwareAddr.String()
+				a := &inner.AgentReport_Addr{Mac: &mac, Ips: ips}
 				report.Addrs = append(report.Addrs, a)
 			}
 		} else {

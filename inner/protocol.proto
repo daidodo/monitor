@@ -2,8 +2,8 @@ package inner;
 
 message AgentReport {
     message Addr {
-        optional bytes mac = 1;
-        optional bytes ip = 2;
+        optional string mac = 1;
+        repeated string ips = 2;
     }
     message Node {
         optional uint32 attr = 1;
