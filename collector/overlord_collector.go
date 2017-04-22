@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"database/sql"
 	"fmt"
 	"log"
@@ -89,16 +88,19 @@ func process(report *inner.AgentReport, addr *net.UDPAddr) {
 		log.Printf("No attrs in report=%+v from %v, ignore it", report, addr)
 		return
 	}
-	sql := bytes.NewBufferString("insert into attrs(mac,attr,value) values ")
+	ps, err := gDb.Prepare("insert into attrs(mac,attr,value) values (?,?,?)")
+	if err != nil {
+		log.Printf("Cannot prepare statement: %v", err)
+		return
+	}
+	defer ps.Close()
 	for _, attr := range report.GetAttrs() {
 		a, v := attr.GetAttr(), attr.GetValue()
 		for _, m := range macs {
-			fmt.Fprintf(sql, "('%v',%v,%v),", m, a, v)
+			if _, err := ps.Exec(m, a, v); err != nil {
+				log.Printf("Cannot update table 'attrs' for mac=%v, attr=%v, value=%v: %v", m, a, v, err)
+			}
 		}
-	}
-	sql.Truncate(sql.Len() - 1) // truncate last ','
-	if _, err := gDb.Exec(sql.String()); err != nil {
-		log.Printf("Cannot update table 'attrs': %v", err)
 	}
 }
 
