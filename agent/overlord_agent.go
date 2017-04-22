@@ -3,11 +3,16 @@ package main
 import (
 	"log"
 	"net"
+	"sync/atomic"
 	"time"
 
+	sigar "github.com/cloudfoundry/gosigar"
+	"github.com/daidodo/overlord/attr"
 	"github.com/daidodo/overlord/inner"
 	"github.com/golang/protobuf/proto"
 )
+
+const kSleep = 10 * time.Second
 
 func main() {
 	// init log
@@ -27,10 +32,12 @@ func main() {
 		log.Fatalf("Cannot init network: %v\n", err)
 	}
 	defer conn.Close()
+	// system stats
+	go systemStats()
 	// loop
 	log.Println("program started")
 	for {
-		time.Sleep(60 * time.Second)
+		time.Sleep(kSleep)
 		report := &inner.AgentReport{}
 		// interfaces & ips
 		if ifs, err := net.Interfaces(); err == nil {
@@ -66,12 +73,12 @@ func main() {
 			log.Printf("Cannot get interfaces: %v", err)
 		}
 		// attrs
-		for _, n := range ns {
+		for i, n := range ns {
 			if n.Attr == 0 {
 				break
 			}
-			// atomic operation
-			a := &inner.AgentReport_Node{Attr: proto.Uint32(n.Attr), Value: proto.Uint64(n.Value)}
+			v := atomic.SwapUint64(&ns[i].Value, 0)
+			a := &inner.AgentReport_Node{Attr: proto.Uint32(n.Attr), Value: proto.Uint64(v)}
 			report.Attrs = append(report.Attrs, a)
 		}
 		msg, err := proto.Marshal(report)
@@ -93,8 +100,24 @@ func main() {
 			continue
 		}
 		// debug
-		log.Printf("msg (size=%v) were sent to %v, report=%v", len(msg), conn.RemoteAddr(), report)
+		log.Printf("msg (size=%v) were sent to %v, report=%+v", len(msg), conn.RemoteAddr(), report)
 	}
 	// exit
 	log.Fatalln("program exit!")
+}
+
+func systemStats() {
+	// attrs
+	const kTotalMem = 1
+	var s sigar.ConcreteSigar
+	for {
+		// memory info
+		if mem, err := s.GetMem(); err != nil {
+			log.Printf("Cannot get memory info: %v", err)
+		} else {
+			attr.Set(kTotalMem, mem.Total)
+		}
+
+		time.Sleep(kSleep)
+	}
 }
