@@ -39,7 +39,7 @@ func main() {
 	for {
 		time.Sleep(kSleep)
 		report := &inner.AgentReport{}
-		// interfaces & ips
+		// addrs
 		if ifs, err := net.Interfaces(); err == nil {
 			for _, i := range ifs {
 				if i.Flags&net.FlagUp == 0 || i.Flags&net.FlagLoopback != 0 {
@@ -77,6 +77,9 @@ func main() {
 			if n.Attr == 0 {
 				break
 			}
+			if n.Value == 0 {
+				continue
+			}
 			v := atomic.SwapUint64(&ns[i].Value, 0)
 			a := &inner.AgentReport_Node{Attr: proto.Uint32(n.Attr), Value: proto.Uint64(v)}
 			report.Attrs = append(report.Attrs, a)
@@ -108,14 +111,66 @@ func main() {
 
 func systemStats() {
 	// attrs
-	const kTotalMem = 1
+	const kCpuMax = 64
+	const (
+		_        = iota
+		kLoadOne // sys load
+		kLoadFive
+		kLoadFifteen
+		kCpu0 // cpu
+
+		kMemTotal = iota + kCpuMax - 1 // memory
+		kMemUsed
+		kMemFree
+		kSwapTotal // swap
+		kSwapUsed
+		kSwapFree
+	)
+	var cpus sigar.CpuList
+	if err := cpus.Get(); err != nil {
+		log.Printf("Cannot get cpu usage: %v", err)
+	}
+	time.Sleep(kSleep / 2)
 	var s sigar.ConcreteSigar
 	for {
-		// memory info
+		// sys load
+		if load, err := s.GetLoadAverage(); err != nil {
+			log.Printf("Cannot get system loads: %v", err)
+		} else {
+			attr.Set(kLoadOne, uint64(load.One*100))
+			attr.Set(kLoadFive, uint64(load.Five*100))
+			attr.Set(kLoadFifteen, uint64(load.Fifteen*100))
+		}
+		// cpu usage
+		var cur sigar.CpuList
+		if err := cur.Get(); err != nil {
+			log.Printf("Cannot get cpu usage: %v", err)
+		} else {
+			for i, cpu := range cur.List {
+				c := cpu.Delta(cpus.List[i])
+				t, u := c.Total(), uint64(0)
+				if t > 0 {
+					u = (t - c.Idle) * 10000 / t
+				}
+				attr.Set(uint32(kCpu0+i), u)
+			}
+			cpus = cur
+		}
+		// memory usage
 		if mem, err := s.GetMem(); err != nil {
 			log.Printf("Cannot get memory info: %v", err)
 		} else {
-			attr.Set(kTotalMem, mem.Total)
+			attr.Set(kMemTotal, mem.Total)
+			attr.Set(kMemUsed, mem.ActualUsed)
+			attr.Set(kMemFree, mem.ActualFree)
+		}
+		// swap usage
+		if swap, err := s.GetSwap(); err != nil {
+			log.Printf("Cannot get swap info: %v", err)
+		} else {
+			attr.Set(kSwapTotal, swap.Total)
+			attr.Set(kSwapUsed, swap.Used)
+			attr.Set(kSwapFree, swap.Free)
 		}
 
 		time.Sleep(kSleep)
