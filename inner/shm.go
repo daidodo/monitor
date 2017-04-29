@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	filePath = "/tmp/attr.data"
+	filePath = "/tmp/overlord_attr.data"
 	maxLen   = int64(10 << 10)
 )
 
