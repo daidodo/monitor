@@ -1,8 +1,9 @@
 package attr
 
 import (
-	"fmt"
+	"log"
 	"sync/atomic"
+	"time"
 
 	"github.com/daidodo/overlord/inner"
 )
@@ -10,7 +11,7 @@ import (
 // Add increments value for 'attr' by 'delta'
 func Add(attr uint32, delta uint64) {
 	if delta > 0 {
-		n := ns.FindNode(attr)
+		n := node(attr)
 		if n != nil && attr == n.Attr {
 			atomic.AddUint64(&n.Value, delta)
 		}
@@ -19,7 +20,7 @@ func Add(attr uint32, delta uint64) {
 
 // Set sets value for 'attr' to 'value'
 func Set(attr uint32, value uint64) {
-	n := ns.FindNode(attr)
+	n := node(attr)
 	if n != nil && attr == n.Attr {
 		atomic.StoreUint64(&n.Value, value)
 	}
@@ -27,9 +28,23 @@ func Set(attr uint32, value uint64) {
 
 var ns inner.Nodes
 
+func node(attr uint32) *inner.Node {
+	if ns != nil {
+		return ns.FindNode(attr)
+	}
+	return nil
+}
+
 func init() {
-	var err error
-	if ns, err = inner.Attach(false); err != nil {
-		panic(fmt.Errorf("Cannot init overlord/attr: %v", err))
+	if ns, _ = inner.Attach(false); ns == nil {
+		go func() {
+			for ns == nil {
+				time.Sleep(time.Second)
+				var err error
+				if ns, err = inner.Attach(false); err != nil {
+					log.Printf("Cannot init overlord/attr: %v", err)
+				}
+			}
+		}()
 	}
 }
